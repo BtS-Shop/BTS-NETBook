@@ -1,0 +1,5 @@
+{
+  "name": "NetBook",
+  "description": "A futuristic social network with integrated AI assistants (Gemini, Grok, GPT, Claude), AI content generation, and creative tools.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
