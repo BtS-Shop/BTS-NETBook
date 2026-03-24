@@ -1,3 +1,21 @@
+export interface LibraryItem {
+  id: string;
+  type: "image" | "video" | "audio" | "file";
+  category: "ai-generated" | "photos" | "music" | "other";
+  url: string;
+  name: string;
+  timestamp: number;
+}
+
+export interface AIAssistant {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+  status: "active" | "idle" | "learning";
+  model: "gemini" | "grok" | "gpt" | "claude";
+}
+
 export interface User {
   id?: string;
   name: string;
@@ -15,6 +33,8 @@ export interface User {
     following: number;
     aiInteractions: number;
   };
+  library?: LibraryItem[];
+  aiAssistants?: AIAssistant[];
 }
 
 export interface Post {
@@ -34,7 +54,28 @@ export interface Post {
   time: string;
   privacy: "public" | "friends" | "private";
   vocalImprint?: string | null;
+  aiInsight?: string | null;
+  groupId?: string | null;
+  customStyle?: string | null;
   files?: { name: string; type: string; url: string | null }[];
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  coverPhoto: string | null;
+  adminId: string;
+  memberCount: number;
+  isMember?: boolean;
+  createdAt: string;
+}
+
+export interface GroupMember {
+  userId: string;
+  groupId: string;
+  role: "admin" | "member";
+  joinedAt: string;
 }
 
 export interface Comment {

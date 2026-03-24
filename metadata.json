@@ -1,5 +1,5 @@
 {
-  "name": "NetBook",
-  "description": "A futuristic social network with integrated AI assistants (Gemini, Grok, GPT, Claude), AI content generation, and creative tools.",
+  "name": "Netbook Baby",
+  "description": "A futuristic social network and digital diary for the BTS protocol, featuring AI assistants, data persistence, and structured export capabilities.",
   "requestFramePermissions": ["camera", "microphone"]
 }
