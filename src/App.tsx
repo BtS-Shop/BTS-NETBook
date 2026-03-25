@@ -3864,3 +3864,205 @@ export default function App() {
     </div>
   );
 }
+
+const handlePost = () => {
+    if (!text.trim() && !imgUrl && !videoUrl && !vocalImprint) return;
+
+    const newPost: Post = {
+      id: Date.now().toString(),
+      user: {
+        id: user.sub || "me",
+        name: user.name,
+        avatar: user.picture || LOGO_URL,
+      },
+      content: text,
+      image: imgUrl,
+      video: videoUrl,
+      createdAt: new Date().toISOString(),
+      likes: 0,
+      comments: [],
+      shares: 0,
+      saved: false,
+      type: postType,
+      privacy,
+      vocalImprint,
+      groupId: selectedGroupId,
+      hashtags: analysis?.hashtags || [],
+    };
+
+    onPost(newPost, selectedGroupId);
+    onClose();
+
+    // Reset
+    setText("");
+    setImgUrl(null);
+    setVideoUrl(null);
+    setLocalPreview(null);
+    setLocalType(null);
+    setAiPrompt("");
+    setAnalysis(null);
+    setVocalImprint(null);
+    setSelectedGroupId(null);
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/80 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, y: 20, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.95, y: 20, opacity: 0 }}
+          transition={{ type: "spring", bounce: 0.05 }}
+          className="bg-[#12121e] w-full max-w-2xl rounded-3xl border border-white/10 overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+            <h2 className="text-xl font-bold text-white flex items-center gap-3">
+              <Sparkles className="text-purple-400" /> Vytvořit příspěvek
+            </h2>
+            <button onClick={onClose} className="text-white/50 hover:text-white">
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+            {/* User info */}
+            <div className="flex items-center gap-3">
+              <Avatar name={user.name} pic={user.picture} size={48} />
+              <div>
+                <p className="font-semibold text-white">{user.name}</p>
+                <select
+                  value={privacy}
+                  onChange={(e) => setPrivacy(e.target.value as any)}
+                  className="bg-transparent text-xs text-white/60 outline-none"
+                >
+                  <option value="public">🌍 Veřejné</option>
+                  <option value="friends">👥 Přátelé</option>
+                  <option value="private">🔒 Pouze já</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Co ti dneska teče hlavou, brácho? 🔥"
+              className="w-full bg-transparent text-white placeholder:text-white/40 text-lg resize-y min-h-[120px] outline-none"
+            />
+
+            {/* AI Insight */}
+            {textInsight && (
+              <div className="p-4 bg-purple-900/20 border border-purple-500/30 rounded-2xl text-sm text-purple-200">
+                💡 AI Insight: {textInsight}
+              </div>
+            )}
+
+            {/* Preview media */}
+            {localPreview && (
+              <div className="relative rounded-2xl overflow-hidden border border-white/10">
+                {localType === "image" ? (
+                  <img src={localPreview} alt="preview" className="w-full max-h-[420px] object-cover" />
+                ) : (
+                  <video src={localPreview} controls className="w-full max-h-[420px] object-cover" />
+                )}
+                <button
+                  onClick={() => { setLocalPreview(null); setImgUrl(null); setVideoUrl(null); }}
+                  className="absolute top-3 right-3 bg-black/70 p-2 rounded-full"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            )}
+
+            {/* AI Tools + Uploads */}
+            <div className="flex flex-wrap gap-3">
+              <label className="cursor-pointer flex-1">
+                <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <div className="h-11 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all">
+                  <Image size={20} className="text-cyan-400" /> Fotka
+                </div>
+              </label>
+
+              <label className="cursor-pointer flex-1">
+                <input type="file" ref={videoInputRef} accept="video/*" className="hidden" onChange={handleVideoUpload} />
+                <div className="h-11 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all">
+                  <Video size={20} className="text-purple-400" /> Reel / Video
+                </div>
+              </label>
+
+              <button
+                onClick={handleGenerateCaption}
+                disabled={aiCaptionLoading}
+                className="flex-1 h-11 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/30 rounded-2xl flex items-center justify-center gap-2 hover:from-pink-500/20 transition-all"
+              >
+                {aiCaptionLoading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />} AI Caption
+              </button>
+            </div>
+
+            {/* AI Generate Section */}
+            <div className="pt-4 border-t border-white/10">
+              <div className="text-xs uppercase tracking-widest text-white/40 mb-2">AI Generátor</div>
+              <div className="flex gap-2">
+                <input
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="Popiš, co chceš vygenerovat..."
+                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-sm outline-none focus:border-purple-400"
+                />
+                <button
+                  onClick={handleGenerateImage}
+                  disabled={genLoading || !aiPrompt.trim()}
+                  className="px-6 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 rounded-2xl font-semibold text-cyan-400 disabled:opacity-50"
+                >
+                  {genLoading ? "..." : "Obrázek"}
+                </button>
+                <button
+                  onClick={handleGenerateVideo}
+                  disabled={genLoading || !aiPrompt.trim()}
+                  className="px-6 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-400/30 rounded-2xl font-semibold text-purple-400 disabled:opacity-50"
+                >
+                  {genLoading ? "..." : "Video"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="border-t border-white/10 p-4 flex items-center justify-between bg-[#0a0a12]">
+            <div className="flex gap-2">
+              <button onClick={handleRecord} disabled={isRecording} className="px-5 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center gap-2 text-pink-400">
+                {isRecording ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    Nahrávám... {Math.round(recordingProgress)}%
+                  </div>
+                ) : (
+                  <>
+                    <Mic size={18} /> Vocal Imprint
+                  </>
+                )}
+              </button>
+            </div>
+
+            <button
+              onClick={handlePost}
+              disabled={!text.trim() && !imgUrl && !videoUrl && !vocalImprint}
+              className="px-10 py-3 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-2xl font-bold text-lg tracking-wider disabled:from-zinc-700 disabled:to-zinc-700 transition-all active:scale-95"
+            >
+              POSTNout do Nexus 🔥
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
