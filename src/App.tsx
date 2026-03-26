@@ -374,6 +374,10 @@ function CreatePostModal({ user, onClose, onPost, initialText = "", groups = [] 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 30 * 1024 * 1024) {
+        alert("Soubor je příliš velký. Maximální velikost je 30MB.");
+        return;
+      }
       setLocalPreview(URL.createObjectURL(file));
       setLocalType("image");
       setUploading(true);
@@ -421,6 +425,10 @@ function CreatePostModal({ user, onClose, onPost, initialText = "", groups = [] 
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 30 * 1024 * 1024) {
+        alert("Soubor je příliš velký. Maximální velikost je 30MB.");
+        return;
+      }
       setLocalPreview(URL.createObjectURL(file));
       setLocalType("video");
       setUploading(true);
@@ -2621,6 +2629,11 @@ function ProfileView({ user, posts, onUpdatePost, onUpdateUser, onChat }: { user
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'cover') => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 30 * 1024 * 1024) {
+      alert("Soubor je příliš velký. Maximální velikost je 30MB.");
+      return;
+    }
 
     setUploading(true);
     const formData = new FormData();
