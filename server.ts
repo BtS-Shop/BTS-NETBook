@@ -12,21 +12,19 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+try {
+  fs.accessSync(uploadsDir, fs.constants.W_OK);
+  console.log("Uploads directory is writable:", uploadsDir);
+} catch (err) {
+  console.error("Uploads directory is NOT writable:", uploadsDir, err);
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  }
-});
-
 const upload = multer({ 
-  storage,
+  dest: uploadsDir,
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
@@ -84,6 +82,19 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(post_id) REFERENCES posts(id)
   );
+
+  -- Seed admin user
+  INSERT OR IGNORE INTO users (id, name, email, picture, provider, bio, location, cover_photo)
+  VALUES (
+    'admin_master_001', 
+    'Architekt (Správce)', 
+    'bellapiskota@gmail.com', 
+    'https://i.ibb.co/v6YpP6C/bts-logo.png', 
+    'master', 
+    'Architekt a správce protokolu BTS. Sjednocená entita v plném provozu.', 
+    'Nexus Prime', 
+    'https://picsum.photos/seed/admin-cover/1200/400'
+  );
 `);
 
 // Migration: Add ai_insight column if it doesn't exist
@@ -97,14 +108,23 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
-  app.use("/uploads", express.static("uploads"));
-
-  // Logging middleware for API
   app.use("/api", (req, res, next) => {
     console.log(`${req.method} ${req.originalUrl}`);
     next();
+  });
+
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use("/uploads", express.static(uploadsDir));
+
+  // API Routes
+  app.post("/api/upload", (req, res, next) => {
+    console.log("Upload request received");
+    next();
+  }, upload.single("file"), (req, res) => {
+    console.log("File upload processed:", req.file);
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    res.json({ url: `/uploads/${req.file.filename}` });
   });
 
   // OAuth Routes
@@ -172,11 +192,6 @@ async function startServer() {
       ORDER BY p.created_at DESC
     `).all();
     res.json(posts);
-  });
-
-  app.post("/api/upload", upload.single("file"), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    res.json({ url: `/uploads/${req.file.filename}` });
   });
 
   app.post("/api/posts", (req, res) => {
@@ -289,14 +304,8 @@ async function startServer() {
   });
 
   // API 404 handler
-  app.use("/api/*", (req, res) => {
+  app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
-  });
-
-  // Error handling middleware
-  app.use((err: any, req: any, res: any, next: any) => {
-    console.error("Server Error:", err);
-    res.status(500).json({ error: "Internal Server Error", details: err.message });
   });
 
   // Vite middleware for development
@@ -312,6 +321,12 @@ async function startServer() {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
+
+  // Error handling middleware - MUST BE LAST
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("Server Error:", err);
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

@@ -51,14 +51,25 @@ export async function chatWithAI(messages: { role: string; content: string }[], 
   return response.text;
 }
 
-export async function generateAIImage(prompt: string, highQuality: boolean = false, referenceImage?: string) {
+export async function generateAIImage(prompt: string, referenceImage?: string, style?: string, aspectRatio: string = "1:1") {
   const ai = getAI();
   const parts: any[] = [];
-  const model = highQuality ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
+
+  let finalPrompt = prompt;
+  if (style && style !== "none") {
+    const stylePrompts: Record<string, string> = {
+      photorealistic: "ve fotorealistickém stylu, vysoké detaily, 8k rozlišení",
+      cartoon: "v kresleném stylu, výrazné barvy, hravé",
+      abstract: "v abstraktním stylu, umělecké, snové",
+      cyberpunk: "v cyberpunkovém stylu, neonová světla, futuristické",
+      oilpainting: "jako olejomalba, viditelné tahy štětcem, klasické umění"
+    };
+    finalPrompt = `${prompt} (${stylePrompts[style] || style})`;
+  }
 
   if (referenceImage) {
     let data = referenceImage;
-    let mimeType = "image/jpeg";
+    let mimeType = "image/png";
     if (referenceImage.startsWith("data:")) {
       const match = referenceImage.match(/^data:([^;]+);base64,(.+)$/);
       if (match) {
@@ -66,30 +77,28 @@ export async function generateAIImage(prompt: string, highQuality: boolean = fal
         data = match[2];
       }
     }
-    
-    // Multimodal array structure as requested
-    parts.push({ text: `Tvůj textový prompt: ${prompt}` });
     parts.push({
       inlineData: {
         data,
         mimeType
       }
     });
+    parts.push({
+      text: `Použij přiložený obrázek jako referenci/předlohu a vytvoř nový obrázek na základě tohoto popisu: ${finalPrompt}. Zachovej klíčové prvky, styl nebo kompozici z předlohy tam, kde je to relevantní.`
+    });
   } else {
-    parts.push({ text: prompt });
+    parts.push({ text: finalPrompt });
   }
 
   const response = await ai.models.generateContent({
-    model: model,
+    model: 'gemini-2.5-flash-image',
     contents: {
       parts,
     },
     config: {
-      imageConfig: highQuality ? {
-        imageSize: "1K",
-        aspectRatio: "1:1"
-      } : undefined,
-      systemInstruction: "Jsi kreativní generátor BTS. Pokud obdržíš obrázek (např. Logo), použij jeho tvary, barvy a kompozici jako základní předlohu. Do této předlohy vkomponuj subjekty zadané textem tak, aby výsledek působil jako organické spojení loga a nového obsahu. Zachovej estetiku BTS (BotSync)."
+      imageConfig: {
+        aspectRatio: aspectRatio as any,
+      }
     }
   });
   

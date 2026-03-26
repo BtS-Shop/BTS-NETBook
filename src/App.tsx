@@ -14,7 +14,7 @@ import {
   ArrowLeft, Paperclip, ThumbsUp, Star, Edit3, Trash2,
   ChevronDown, Check, AlertCircle, Download, MapPin, Calendar, Facebook, Lightbulb
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import Markdown from "react-markdown";
 import { User as UserType, Post, Comment, Story, Friend, LibraryItem, AIAssistant, Group } from "@/src/types";
 import { 
@@ -381,6 +381,19 @@ function CreatePostModal({ user, onClose, onPost, initialText = "", groups = [] 
       formData.append("file", file);
       try {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) {
+          const text = await res.text();
+          console.error(`Upload failed with status ${res.status}:`, text);
+          throw new Error(`Server returned ${res.status}: ${text.substring(0, 100)}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await res.text();
+          console.error(`Expected JSON for upload, but got ${contentType}`, text.substring(0, 100));
+          throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+        }
+
         const data = await res.json();
         if (data.url) {
           setImgUrl(data.url);
@@ -415,6 +428,19 @@ function CreatePostModal({ user, onClose, onPost, initialText = "", groups = [] 
       formData.append("file", file);
       try {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) {
+          const text = await res.text();
+          console.error(`Upload failed with status ${res.status}:`, text);
+          throw new Error(`Server returned ${res.status}: ${text.substring(0, 100)}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await res.text();
+          console.error(`Expected JSON for upload, but got ${contentType}`, text.substring(0, 100));
+          throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+        }
+
         const data = await res.json();
         if (data.url) {
           setVideoUrl(data.url);
@@ -432,7 +458,7 @@ function CreatePostModal({ user, onClose, onPost, initialText = "", groups = [] 
     if (!aiPrompt.trim()) return;
     setGenLoading(true);
     try {
-      const url = await generateAIImage(aiPrompt, highQuality);
+      const url = await generateAIImage(aiPrompt);
       if (url) setImgUrl(url);
     } catch (err) {
       console.error(err);
@@ -753,50 +779,22 @@ function CreatePostModal({ user, onClose, onPost, initialText = "", groups = [] 
                 placeholder="Popiš, co chceš vytvořit..."
                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white text-xs outline-none focus:border-purple-500/30"
               />
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                animate={genLoading ? { 
-                  boxShadow: ["0 0 0px rgba(168, 85, 247, 0)", "0 0 15px rgba(168, 85, 247, 0.4)", "0 0 0px rgba(168, 85, 247, 0)"],
-                } : {}}
-                transition={{ duration: 1.5, repeat: Infinity }}
+              <button
                 onClick={handleGenerateImage}
                 disabled={genLoading || !aiPrompt.trim()}
-                className="px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold flex items-center gap-2 hover:bg-purple-500/20 disabled:opacity-50 relative overflow-hidden"
+                className="px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold flex items-center gap-2 hover:bg-purple-500/20 disabled:opacity-50"
               >
-                {genLoading && (
-                  <motion.div 
-                    initial={{ x: "-100%" }}
-                    animate={{ x: "100%" }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                  />
-                )}
                 {genLoading ? <Loader2 size={14} className="animate-spin" /> : <Image size={14} />}
                 Obrázek
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                animate={genLoading ? { 
-                  boxShadow: ["0 0 0px rgba(0, 200, 255, 0)", "0 0 15px rgba(0, 200, 255, 0.4)", "0 0 0px rgba(0, 200, 255, 0)"],
-                } : {}}
-                transition={{ duration: 1.5, repeat: Infinity }}
+              </button>
+              <button
                 onClick={handleGenerateVideo}
                 disabled={genLoading || !aiPrompt.trim()}
-                className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold flex items-center gap-2 hover:bg-cyan-500/20 disabled:opacity-50 relative overflow-hidden"
+                className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold flex items-center gap-2 hover:bg-cyan-500/20 disabled:opacity-50"
               >
-                {genLoading && (
-                  <motion.div 
-                    initial={{ x: "-100%" }}
-                    animate={{ x: "100%" }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                  />
-                )}
                 {genLoading ? <Loader2 size={14} className="animate-spin" /> : <Video size={14} />}
                 Video
-              </motion.button>
+              </button>
             </div>
           </div>
 
@@ -1368,99 +1366,79 @@ function Messenger({ user, friends, onClose }: { user: UserType, friends: Friend
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 no-scrollbar bg-gradient-to-b from-transparent to-white/[0.02]">
-        <motion.div
-          key={active?.id}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col gap-4"
-        >
-          {msgs.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center opacity-20 py-20">
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                <MessageCircle size={32} />
-              </div>
-              <p className="text-sm font-medium">Začni chatovat s {aiMode ? persona?.name : active?.name}</p>
-              <p className="text-[10px] mt-1">Zprávy jsou šifrovány protokolem Nexus</p>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 no-scrollbar bg-gradient-to-b from-transparent to-white/[0.02]">
+        {msgs.length === 0 && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center opacity-20">
+            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+              <MessageCircle size={32} />
             </div>
-          )}
-          <AnimatePresence mode="popLayout">
-            {msgs.map(m => {
-              const isMe = m.from === "me";
-              const isAI = m.from === "ai";
-              const p = isAI ? (AI_MODELS as any)[m.persona] : null;
-              return (
-                <motion.div 
-                  key={m.id} 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.2 }}
-                  className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end group`}
-                >
-                  {!isMe && (
-                    <div className="flex-shrink-0 mb-1">
-                      <Avatar name={isAI ? p?.name : active.name} size={28} color={isAI ? p?.color : active.color} />
-                    </div>
-                  )}
-                  <div className={`relative max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed transition-all ${
-                    isMe 
-                      ? 'bg-purple-500/20 border border-purple-500/30 text-white rounded-br-none' 
-                      : isAI 
-                        ? 'bg-white/5 border border-white/10 text-white rounded-bl-none' 
-                        : 'bg-white/5 border border-white/10 text-white/80 rounded-bl-none'
-                  }`}
-                  style={{
-                    borderColor: isAI ? p?.color + "30" : undefined,
-                    boxShadow: isAI ? `0 4px 20px -5px ${p?.color}10` : 'none'
-                  }}
-                  >
-                    {isAI && (
-                      <div className="text-[9px] font-bold mb-1.5 flex items-center justify-between gap-2" style={{ color: p?.color }}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs">{p?.icon}</span>
-                          <span className="uppercase tracking-wider">{p?.name}</span>
-                        </div>
-                        <span className="text-[7px] opacity-40 font-mono">v{Math.random().toString().slice(2, 5)}</span>
-                      </div>
-                    )}
-                    <div className="prose prose-invert prose-xs max-w-none">
-                      <Markdown>{m.text}</Markdown>
-                    </div>
-                    <div className="text-[8px] opacity-30 mt-2 flex items-center justify-end gap-1">
-                      {m.time}
-                      {isMe && <Check size={8} className="text-purple-400" />}
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-          {aiBusy && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex gap-3 items-end"
-            >
-              <div className="flex-shrink-0 mb-1">
-                <Avatar name={persona?.name} size={28} color={persona?.color} />
-              </div>
-              <div 
-                className="bg-white/5 border border-white/10 p-3 rounded-2xl rounded-bl-none flex gap-1.5 items-center"
-                style={{ borderColor: persona?.color + "30" }}
+            <p className="text-sm font-medium">Začni chatovat s {aiMode ? persona?.name : active?.name}</p>
+            <p className="text-[10px] mt-1">Zprávy jsou šifrovány protokolem Nexus</p>
+          </div>
+        )}
+        {msgs.map(m => {
+          const isMe = m.from === "me";
+          const isAI = m.from === "ai";
+          const p = isAI ? (AI_MODELS as any)[m.persona] : null;
+          return (
+            <div key={m.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end group`}>
+              {!isMe && (
+                <div className="flex-shrink-0 mb-1">
+                  <Avatar name={isAI ? p?.name : active.name} size={28} color={isAI ? p?.color : active.color} />
+                </div>
+              )}
+              <div className={`relative max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed transition-all ${
+                isMe 
+                  ? 'bg-purple-500/20 border border-purple-500/30 text-white rounded-br-none' 
+                  : isAI 
+                    ? 'bg-white/5 border border-white/10 text-white rounded-bl-none' 
+                    : 'bg-white/5 border border-white/10 text-white/80 rounded-bl-none'
+              }`}
+              style={{
+                borderColor: isAI ? p?.color + "30" : undefined,
+                boxShadow: isAI ? `0 4px 20px -5px ${p?.color}10` : 'none'
+              }}
               >
-                <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: persona?.color }} />
-                <div className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.2s]" style={{ backgroundColor: persona?.color }} />
-                <div className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s]" style={{ backgroundColor: persona?.color }} />
-                <span className="text-[9px] ml-2 font-bold uppercase tracking-widest opacity-60 flex items-center gap-1.5" style={{ color: persona?.color }}>
-                  <span>{persona?.icon}</span>
-                  <span>{persona?.name} přemýšlí...</span>
-                </span>
+                {isAI && (
+                  <div className="text-[9px] font-bold mb-1.5 flex items-center justify-between gap-2" style={{ color: p?.color }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs">{p?.icon}</span>
+                      <span className="uppercase tracking-wider">{p?.name}</span>
+                    </div>
+                    <span className="text-[7px] opacity-40 font-mono">v{Math.random().toString().slice(2, 5)}</span>
+                  </div>
+                )}
+                <div className="prose prose-invert prose-xs max-w-none">
+                  <Markdown>{m.text}</Markdown>
+                </div>
+                <div className="text-[8px] opacity-30 mt-2 flex items-center justify-end gap-1">
+                  {m.time}
+                  {isMe && <Check size={8} className="text-purple-400" />}
+                </div>
               </div>
-            </motion.div>
-          )}
-          <div ref={endRef} />
-        </motion.div>
+            </div>
+          );
+        })}
+        {aiBusy && (
+          <div className="flex gap-3 items-end">
+            <div className="flex-shrink-0 mb-1">
+              <Avatar name={persona?.name} size={28} color={persona?.color} />
+            </div>
+            <div 
+              className="bg-white/5 border border-white/10 p-3 rounded-2xl rounded-bl-none flex gap-1.5 items-center"
+              style={{ borderColor: persona?.color + "30" }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: persona?.color }} />
+              <div className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.2s]" style={{ backgroundColor: persona?.color }} />
+              <div className="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s]" style={{ backgroundColor: persona?.color }} />
+              <span className="text-[9px] ml-2 font-bold uppercase tracking-widest opacity-60 flex items-center gap-1.5" style={{ color: persona?.color }}>
+                <span>{persona?.icon}</span>
+                <span>{persona?.name} přemýšlí...</span>
+              </span>
+            </div>
+          </div>
+        )}
+        <div ref={endRef} />
       </div>
 
       {/* Input */}
@@ -1826,7 +1804,6 @@ function CreatorStudio({ user, onSave, onDraft, onPost }: { user: UserType, onSa
   const [canvasMode, setCanvasMode] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [tool, setTool] = useState<"brush" | "erase">("brush");
-  const [highQuality, setHighQuality] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSelectKey = async () => {
@@ -1864,7 +1841,7 @@ function CreatorStudio({ user, onSave, onDraft, onPost }: { user: UserType, onSa
 
     try {
       if (activeTool === "graphics") {
-        const url = await generateAIImage(prompt, highQuality, refImage || undefined);
+        const url = await generateAIImage(prompt, false, refImage || undefined);
         setResult(url);
         if (url) {
           onPost({
@@ -1885,7 +1862,7 @@ function CreatorStudio({ user, onSave, onDraft, onPost }: { user: UserType, onSa
           });
         }
       } else if (activeTool === "video") {
-        const url = await generateAIVideo(prompt, highQuality);
+        const url = await generateAIVideo(prompt);
         setResult(url);
         if (url) {
           onPost({
@@ -1982,52 +1959,24 @@ function CreatorStudio({ user, onSave, onDraft, onPost }: { user: UserType, onSa
           ))}
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-3">
-            <input 
-              placeholder={
-                activeTool === "summarize" ? "Vlož text k sumarizaci..." :
-                activeTool === "ideas" ? "Zadej téma pro nápady..." :
-                `Popiš, co chceš vytvořit (${activeTool})...`
-              } 
-              value={prompt} 
-              onChange={(e) => setPrompt(e.target.value)} 
-              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white text-sm outline-none focus:border-purple-500/30 transition-all"
-            />
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              animate={loading ? { 
-                boxShadow: ["0 0 0px rgba(168, 85, 247, 0)", "0 0 20px rgba(168, 85, 247, 0.5)", "0 0 0px rgba(168, 85, 247, 0)"],
-              } : {}}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              onClick={handleGenerate} 
-              disabled={loading || !prompt.trim()}
-              className="px-8 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold text-sm shadow-lg hover:shadow-purple-500/20 transition-all disabled:opacity-50 relative overflow-hidden"
-            >
-              {loading && (
-                <motion.div 
-                  initial={{ x: "-100%" }}
-                  animate={{ x: "100%" }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                />
-              )}
-              {loading ? <Loader2 className="animate-spin" size={18} /> : "Generovat"}
-            </motion.button>
-          </div>
-
-          {(activeTool === "graphics" || activeTool === "video") && (
-            <div className="flex items-center gap-4 px-2">
-              <button 
-                onClick={() => setHighQuality(!highQuality)}
-                className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border transition-all flex items-center gap-2 ${highQuality ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-white/30 hover:text-white/50'}`}
-              >
-                {highQuality ? <Sparkles size={12} /> : <Zap size={12} />}
-                {highQuality ? "Vysoká kvalita (Gemini 3.1)" : "Standardní kvalita"}
-              </button>
-            </div>
-          )}
+        <div className="flex gap-3">
+          <input 
+            placeholder={
+              activeTool === "summarize" ? "Vlož text k sumarizaci..." :
+              activeTool === "ideas" ? "Zadej téma pro nápady..." :
+              `Popiš, co chceš vytvořit (${activeTool})...`
+            } 
+            value={prompt} 
+            onChange={(e) => setPrompt(e.target.value)} 
+            className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-white text-sm outline-none focus:border-purple-500/30 transition-all"
+          />
+          <button 
+            onClick={handleGenerate} 
+            disabled={loading || !prompt.trim()}
+            className="px-8 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold text-sm shadow-lg hover:shadow-purple-500/20 transition-all disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="animate-spin" size={18} /> : "Generovat"}
+          </button>
         </div>
 
         {activeTool === "graphics" && (
@@ -2660,8 +2609,6 @@ function ProfileView({ user, posts, onUpdatePost, onUpdateUser, onChat }: { user
     }
   }, [isEditing, user.name, user.bio, user.location]);
   const [uploading, setUploading] = useState(false);
-  const [localProfilePreview, setLocalProfilePreview] = useState<string | null>(null);
-  const [localCoverPreview, setLocalCoverPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const userPosts = posts.filter(p => p.authorId === user.sub);
@@ -2676,13 +2623,6 @@ function ProfileView({ user, posts, onUpdatePost, onUpdateUser, onChat }: { user
     if (!file) return;
 
     setUploading(true);
-    const previewUrl = URL.createObjectURL(file);
-    if (type === 'profile') {
-      setLocalProfilePreview(previewUrl);
-    } else {
-      setLocalCoverPreview(previewUrl);
-    }
-
     const formData = new FormData();
     formData.append('file', file);
 
@@ -2691,14 +2631,26 @@ function ProfileView({ user, posts, onUpdatePost, onUpdateUser, onChat }: { user
         method: 'POST',
         body: formData
       });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`Upload failed with status ${res.status}:`, text);
+        throw new Error(`Server returned ${res.status}: ${text.substring(0, 100)}`);
+      }
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error(`Expected JSON for upload, but got ${contentType}`, text.substring(0, 100));
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+      }
+
       const data = await res.json();
       if (data.url) {
         if (type === 'profile') {
           onUpdateUser({ ...user, picture: data.url });
-          setLocalProfilePreview(null);
         } else {
           onUpdateUser({ ...user, coverPhoto: data.url });
-          setLocalCoverPreview(null);
         }
       }
     } catch (err) {
@@ -2714,7 +2666,7 @@ function ProfileView({ user, posts, onUpdatePost, onUpdateUser, onChat }: { user
       <div className="bg-[#12121e] rounded-3xl border border-white/10 overflow-hidden">
         <div className="h-48 relative group">
           <img 
-            src={localCoverPreview || user.coverPhoto || "https://picsum.photos/seed/netbook-cover/1200/400"} 
+            src={user.coverPhoto || "https://picsum.photos/seed/netbook-cover/1200/400"} 
             className="w-full h-full object-cover" 
             alt="Cover"
             referrerPolicy="no-referrer"
@@ -2739,9 +2691,9 @@ function ProfileView({ user, posts, onUpdatePost, onUpdateUser, onChat }: { user
         <div className="px-4 sm:px-8 pb-8 relative">
           <div className="absolute -top-12 sm:-top-16 left-4 sm:left-8">
             <div className="relative group">
-              <Avatar name={user.name} pic={localProfilePreview || user.picture} size={80} color={T.purple} className="sm:hidden" />
+              <Avatar name={user.name} pic={user.picture} size={80} color={T.purple} className="sm:hidden" />
               <div className="hidden sm:block">
-                <Avatar name={user.name} pic={localProfilePreview || user.picture} size={120} color={T.purple} />
+                <Avatar name={user.name} pic={user.picture} size={120} color={T.purple} />
               </div>
               <input 
                 type="file" 
@@ -3072,13 +3024,8 @@ function ChatBotView({ assistant, user, onClose }: { assistant: AIAssistant, use
 export default function App() {
   const [user, setUser] = useState<UserType | null>(null);
   const [posts, setPosts] = useState<Post[]>(() => {
-    try {
-      const saved = localStorage.getItem("bts_posts");
-      return saved ? JSON.parse(saved) : [];
-    } catch (err) {
-      console.error("Failed to parse bts_posts from localStorage", err);
-      return [];
-    }
+    const saved = localStorage.getItem("bts_posts");
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Save posts to LocalStorage whenever they change
@@ -3199,11 +3146,12 @@ export default function App() {
     ];
 
     try {
-      const data = await safeFetch(`/api/users/${u.sub}`);
-      if (data) {
+      const res = await fetch(`/api/users/${u.sub}`);
+      if (res.ok) {
+        const data = await res.json();
         const assistants = data.aiAssistants ? JSON.parse(data.aiAssistants) : defaultAssistants;
         setUser({ ...u, ...data, aiAssistants: assistants });
-      } else {
+      } else if (res.status === 404) {
         const newUser = { ...u, aiAssistants: defaultAssistants };
         setUser(newUser);
         await fetch('/api/users', {
@@ -3218,6 +3166,8 @@ export default function App() {
             aiAssistants: JSON.stringify(defaultAssistants)
           })
         });
+      } else {
+        throw new Error(`Fetch error: ${res.status} ${res.statusText}`);
       }
     } catch (err) {
       console.error("Login sync failed", err);
@@ -3862,207 +3812,5 @@ export default function App() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
-  );
-}
-
-const handlePost = () => {
-    if (!text.trim() && !imgUrl && !videoUrl && !vocalImprint) return;
-
-    const newPost: Post = {
-      id: Date.now().toString(),
-      user: {
-        id: user.sub || "me",
-        name: user.name,
-        avatar: user.picture || LOGO_URL,
-      },
-      content: text,
-      image: imgUrl,
-      video: videoUrl,
-      createdAt: new Date().toISOString(),
-      likes: 0,
-      comments: [],
-      shares: 0,
-      saved: false,
-      type: postType,
-      privacy,
-      vocalImprint,
-      groupId: selectedGroupId,
-      hashtags: analysis?.hashtags || [],
-    };
-
-    onPost(newPost, selectedGroupId);
-    onClose();
-
-    // Reset
-    setText("");
-    setImgUrl(null);
-    setVideoUrl(null);
-    setLocalPreview(null);
-    setLocalType(null);
-    setAiPrompt("");
-    setAnalysis(null);
-    setVocalImprint(null);
-    setSelectedGroupId(null);
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/80 backdrop-blur-xl z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.95, y: 20, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.95, y: 20, opacity: 0 }}
-          transition={{ type: "spring", bounce: 0.05 }}
-          className="bg-[#12121e] w-full max-w-2xl rounded-3xl border border-white/10 overflow-hidden"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-            <h2 className="text-xl font-bold text-white flex items-center gap-3">
-              <Sparkles className="text-purple-400" /> Vytvořit příspěvek
-            </h2>
-            <button onClick={onClose} className="text-white/50 hover:text-white">
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-            {/* User info */}
-            <div className="flex items-center gap-3">
-              <Avatar name={user.name} pic={user.picture} size={48} />
-              <div>
-                <p className="font-semibold text-white">{user.name}</p>
-                <select
-                  value={privacy}
-                  onChange={(e) => setPrivacy(e.target.value as any)}
-                  className="bg-transparent text-xs text-white/60 outline-none"
-                >
-                  <option value="public">🌍 Veřejné</option>
-                  <option value="friends">👥 Přátelé</option>
-                  <option value="private">🔒 Pouze já</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Textarea */}
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Co ti dneska teče hlavou, brácho? 🔥"
-              className="w-full bg-transparent text-white placeholder:text-white/40 text-lg resize-y min-h-[120px] outline-none"
-            />
-
-            {/* AI Insight */}
-            {textInsight && (
-              <div className="p-4 bg-purple-900/20 border border-purple-500/30 rounded-2xl text-sm text-purple-200">
-                💡 AI Insight: {textInsight}
-              </div>
-            )}
-
-            {/* Preview media */}
-            {localPreview && (
-              <div className="relative rounded-2xl overflow-hidden border border-white/10">
-                {localType === "image" ? (
-                  <img src={localPreview} alt="preview" className="w-full max-h-[420px] object-cover" />
-                ) : (
-                  <video src={localPreview} controls className="w-full max-h-[420px] object-cover" />
-                )}
-                <button
-                  onClick={() => { setLocalPreview(null); setImgUrl(null); setVideoUrl(null); }}
-                  className="absolute top-3 right-3 bg-black/70 p-2 rounded-full"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            )}
-
-            {/* AI Tools + Uploads */}
-            <div className="flex flex-wrap gap-3">
-              <label className="cursor-pointer flex-1">
-                <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
-                <div className="h-11 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all">
-                  <Image size={20} className="text-cyan-400" /> Fotka
-                </div>
-              </label>
-
-              <label className="cursor-pointer flex-1">
-                <input type="file" ref={videoInputRef} accept="video/*" className="hidden" onChange={handleVideoUpload} />
-                <div className="h-11 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all">
-                  <Video size={20} className="text-purple-400" /> Reel / Video
-                </div>
-              </label>
-
-              <button
-                onClick={handleGenerateCaption}
-                disabled={aiCaptionLoading}
-                className="flex-1 h-11 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/30 rounded-2xl flex items-center justify-center gap-2 hover:from-pink-500/20 transition-all"
-              >
-                {aiCaptionLoading ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />} AI Caption
-              </button>
-            </div>
-
-            {/* AI Generate Section */}
-            <div className="pt-4 border-t border-white/10">
-              <div className="text-xs uppercase tracking-widest text-white/40 mb-2">AI Generátor</div>
-              <div className="flex gap-2">
-                <input
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Popiš, co chceš vygenerovat..."
-                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-sm outline-none focus:border-purple-400"
-                />
-                <button
-                  onClick={handleGenerateImage}
-                  disabled={genLoading || !aiPrompt.trim()}
-                  className="px-6 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 rounded-2xl font-semibold text-cyan-400 disabled:opacity-50"
-                >
-                  {genLoading ? "..." : "Obrázek"}
-                </button>
-                <button
-                  onClick={handleGenerateVideo}
-                  disabled={genLoading || !aiPrompt.trim()}
-                  className="px-6 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-400/30 rounded-2xl font-semibold text-purple-400 disabled:opacity-50"
-                >
-                  {genLoading ? "..." : "Video"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="border-t border-white/10 p-4 flex items-center justify-between bg-[#0a0a12]">
-            <div className="flex gap-2">
-              <button onClick={handleRecord} disabled={isRecording} className="px-5 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center gap-2 text-pink-400">
-                {isRecording ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    Nahrávám... {Math.round(recordingProgress)}%
-                  </div>
-                ) : (
-                  <>
-                    <Mic size={18} /> Vocal Imprint
-                  </>
-                )}
-              </button>
-            </div>
-
-            <button
-              onClick={handlePost}
-              disabled={!text.trim() && !imgUrl && !videoUrl && !vocalImprint}
-              className="px-10 py-3 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-2xl font-bold text-lg tracking-wider disabled:from-zinc-700 disabled:to-zinc-700 transition-all active:scale-95"
-            >
-              POSTNout do Nexus 🔥
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
   );
 }
